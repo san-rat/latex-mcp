@@ -1,0 +1,21 @@
+{
+  "name": "latex-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MCP server and web UI for LLM-driven LaTeX compile/inspect loops via Overleaf's CLSI",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev:backend": "npm run dev --workspace=@latex-mcp/backend",
+    "dev:mcp": "npm run dev --workspace=@latex-mcp/mcp-server"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
