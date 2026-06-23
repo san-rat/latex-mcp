@@ -1,18 +1,24 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as backend from "../backend-client.js";
-import { renderPageToPng } from "../utils/pdf.js";
+import { getPageCount, renderPageToPng } from "../utils/pdf.js";
 
 export function registerPreviewTool(server: McpServer): void {
   server.registerTool(
     "get_pdf_preview",
     {
       description:
-        "Render a page of the most recently compiled PDF as a PNG image, for visually inspecting layout " +
-        "(e.g. checking whether content fits on one page, margins look right, etc.).",
+        "Render page(s) of the most recently compiled PDF as PNG images, for visually inspecting layout " +
+        "(e.g. checking whether content fits on one page, margins look right, etc.). Pass a specific " +
+        "page to render just that one; omit it to render every page in the document in one call.",
       inputSchema: {
         sessionId: z.string().describe("Session id returned by compile_latex"),
-        page: z.number().int().min(1).default(1).describe("1-indexed page number to render"),
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("1-indexed page number to render. Omit to render every page in the document."),
       },
     },
     async ({ sessionId, page }) => {
@@ -28,16 +34,27 @@ export function registerPreviewTool(server: McpServer): void {
           };
         }
 
-        const pngBuffer = await renderPageToPng(pdfPath, page);
-        return {
-          content: [
-            {
-              type: "image" as const,
-              data: pngBuffer.toString("base64"),
-              mimeType: "image/png",
-            },
-          ],
-        };
+        const pageNumbers = page
+          ? [page]
+          : Array.from({ length: await getPageCount(pdfPath) }, (_, i) => i + 1);
+
+        const content = (
+          await Promise.all(
+            pageNumbers.map(async (pageNum) => {
+              const pngBuffer = await renderPageToPng(pdfPath, pageNum);
+              return [
+                { type: "text" as const, text: `Page ${pageNum}` },
+                {
+                  type: "image" as const,
+                  data: pngBuffer.toString("base64"),
+                  mimeType: "image/png",
+                },
+              ];
+            })
+          )
+        ).flat();
+
+        return { content };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         return {
