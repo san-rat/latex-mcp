@@ -4,6 +4,8 @@ import * as api from "./api.js";
 import { Editor } from "./components/Editor.js";
 import { PdfPreview } from "./components/PdfPreview.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
+import { Sidebar } from "./components/Sidebar.js";
+import { openTexFile, saveAsTexFile, saveToHandle } from "./fileSystem.js";
 import { useSessionSocket } from "./useSessionSocket.js";
 
 const DEFAULT_SOURCE = `\\documentclass{article}
@@ -32,6 +34,9 @@ export default function App() {
   const [lastResult, setLastResult] = useState<CompileResult | undefined>(undefined);
   const [pdfUrlValue, setPdfUrlValue] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [fileName, setFileName] = useState("Untitled.tex");
+  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
 
   // Bootstrap: join an existing session from the URL, or create a new one.
   useEffect(() => {
@@ -93,6 +98,60 @@ export default function App() {
     window.location.reload();
   }, [joinInput]);
 
+  const startFreshSession = useCallback(async () => {
+    const session = await api.createSession();
+    setSessionId(session.sessionId);
+    setSessionIdInUrl(session.sessionId);
+    setLastResult(undefined);
+    setPdfUrlValue(undefined);
+  }, []);
+
+  const handleNewFile = useCallback(async () => {
+    setSource(DEFAULT_SOURCE);
+    setFileName("Untitled.tex");
+    setFileHandle(null);
+    setErrorMessage(undefined);
+    await startFreshSession();
+  }, [startFreshSession]);
+
+  const handleOpenFile = useCallback(async () => {
+    try {
+      const opened = await openTexFile();
+      if (!opened) return;
+      setSource(opened.content);
+      setFileName(opened.name);
+      setFileHandle(opened.handle);
+      setErrorMessage(undefined);
+      await startFreshSession();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to open file");
+    }
+  }, [startFreshSession]);
+
+  const handleSaveAs = useCallback(async () => {
+    try {
+      const saved = await saveAsTexFile(source, fileName);
+      if (saved) {
+        setFileName(saved.name);
+        setFileHandle(saved.handle);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save file");
+    }
+  }, [source, fileName]);
+
+  const handleSave = useCallback(async () => {
+    try {
+      if (fileHandle) {
+        await saveToHandle(fileHandle, source);
+      } else {
+        await handleSaveAs();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save file");
+    }
+  }, [fileHandle, source, handleSaveAs]);
+
   return (
     <div className="app">
       <header className="toolbar">
@@ -119,17 +178,28 @@ export default function App() {
         {errorMessage && <span className="error-message">{errorMessage}</span>}
       </header>
 
-      <main className="layout">
-        <div className="pane editor-pane">
-          <Editor value={source} onChange={setSource} editable={!compiling} />
-        </div>
-        <div className="pane preview-pane">
-          <PdfPreview pdfUrl={pdfUrlValue} />
-        </div>
-        <div className="pane diagnostics-pane">
-          <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} />
-        </div>
-      </main>
+      <div className="body">
+        <Sidebar
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen((v) => !v)}
+          fileName={fileName}
+          onNewFile={handleNewFile}
+          onOpenFile={handleOpenFile}
+          onSave={handleSave}
+          onSaveAs={handleSaveAs}
+        />
+        <main className="layout">
+          <div className="pane editor-pane">
+            <Editor value={source} onChange={setSource} editable={!compiling} />
+          </div>
+          <div className="pane preview-pane">
+            <PdfPreview pdfUrl={pdfUrlValue} />
+          </div>
+          <div className="pane diagnostics-pane">
+            <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

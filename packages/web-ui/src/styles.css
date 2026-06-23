@@ -54,6 +54,64 @@ body {
   font-size: 12px;
 }
 
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  flex-shrink: 0;
+  background: #23272e;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.15s ease;
+  overflow: hidden;
+}
+
+.sidebar-collapsed {
+  width: 32px;
+}
+
+.sidebar-open {
+  width: 180px;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: white;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.sidebar-filename {
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.sidebar-content button {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .layout {
   flex: 1;
   min-height: 0;
