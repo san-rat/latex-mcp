@@ -1,15 +1,21 @@
+import http from "node:http";
 import express from "express";
-
-// Placeholder entrypoint for the shared backend service.
-// CLSI client + session manager + WebSocket broadcast land here in a later step.
+import { config } from "./config.js";
+import { sessionsRouter } from "./routes/sessions.js";
+import { attachWebSocketServer } from "./ws.js";
 
 const app = express();
-const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+app.use(express.json({ limit: "25mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.listen(port, () => {
-  console.log(`latex-mcp backend listening on http://localhost:${port}`);
+app.use(sessionsRouter);
+
+const httpServer = http.createServer(app);
+attachWebSocketServer(httpServer);
+
+httpServer.listen(config.port, () => {
+  console.log(`latex-mcp backend listening on http://localhost:${config.port}`);
 });

@@ -31,4 +31,5 @@ export interface SessionInfo {
   lastCompiledAt?: string;
   rootResourcePath?: string;
   resources: ResourceFile[];
+  lastCompileResult?: CompileResult;
 }
