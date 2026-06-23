@@ -1,6 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { CompileResult, Compiler, ResourceFile } from "@latex-mcp/shared";
+import type {
+  CodePosition,
+  CompileResult,
+  Compiler,
+  PdfPosition,
+  ResourceFile,
+  WordCountResult,
+} from "@latex-mcp/shared";
 import { config } from "./config.js";
 
 interface ClsiCompileResponse {
@@ -53,6 +60,46 @@ export async function compileWithClsi(
     pdfPath: (await fileExists(pdfPath)) ? pdfPath : undefined,
     log: log ?? "",
   };
+}
+
+export async function getWordCount(sessionId: string, file: string): Promise<WordCountResult> {
+  const params = new URLSearchParams({ file });
+  const response = await fetch(`${config.clsiUrl}/project/${sessionId}/wordcount?${params}`);
+  if (!response.ok) {
+    throw new Error(`CLSI wordcount request failed (${response.status})`);
+  }
+  const data = (await response.json()) as { texcount: WordCountResult };
+  return data.texcount;
+}
+
+export async function syncCodeToPdf(
+  sessionId: string,
+  file: string,
+  line: number,
+  column = 0
+): Promise<PdfPosition[]> {
+  const params = new URLSearchParams({ file, line: String(line), column: String(column) });
+  const response = await fetch(`${config.clsiUrl}/project/${sessionId}/sync/code?${params}`);
+  if (!response.ok) {
+    throw new Error(`CLSI sync/code request failed (${response.status})`);
+  }
+  const data = (await response.json()) as { pdf: PdfPosition[] };
+  return data.pdf;
+}
+
+export async function syncPdfToCode(
+  sessionId: string,
+  page: number,
+  h: number,
+  v: number
+): Promise<CodePosition[]> {
+  const params = new URLSearchParams({ page: String(page), h: String(h), v: String(v) });
+  const response = await fetch(`${config.clsiUrl}/project/${sessionId}/sync/pdf?${params}`);
+  if (!response.ok) {
+    throw new Error(`CLSI sync/pdf request failed (${response.status})`);
+  }
+  const data = (await response.json()) as { code: CodePosition[] };
+  return data.code;
 }
 
 async function readIfExists(filePath: string): Promise<string | undefined> {

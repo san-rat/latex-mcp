@@ -1,5 +1,7 @@
 // Types shared between the backend service, the MCP server, and the web UI.
 
+export * from "./log-parser.js";
+
 export type Compiler = "pdflatex" | "xelatex" | "lualatex";
 
 export interface ResourceFile {
@@ -32,4 +34,31 @@ export interface SessionInfo {
   rootResourcePath?: string;
   resources: ResourceFile[];
   lastCompileResult?: CompileResult;
+}
+
+export interface WordCountResult {
+  encode: string;
+  textWords: number;
+  headWords: number;
+  outside: number;
+  headers: number;
+  elements: number;
+  mathInline: number;
+  mathDisplay: number;
+  errors: number;
+  messages: string;
+}
+
+export interface PdfPosition {
+  page: number;
+  h: number;
+  v: number;
+  width?: number;
+  height?: number;
+}
+
+export interface CodePosition {
+  file: string;
+  line: number;
+  column: number;
 }

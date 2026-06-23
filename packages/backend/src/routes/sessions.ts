@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Router } from "express";
 import type { Compiler, ResourceFile } from "@latex-mcp/shared";
-import { compileWithClsi } from "../clsi-client.js";
+import { compileWithClsi, getWordCount, syncCodeToPdf, syncPdfToCode } from "../clsi-client.js";
 import { config } from "../config.js";
 import {
   createSession,
@@ -63,6 +63,63 @@ sessionsRouter.post("/sessions/:id/compile", async (req, res) => {
     recordCompileResult(sessionId, result);
     broadcast(sessionId, { type: "compile-result", result });
     res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(502).json({ error: message });
+  }
+});
+
+sessionsRouter.get("/sessions/:id/wordcount", async (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session?.rootResourcePath) {
+    res.status(400).json({ error: "session has no resources set yet" });
+    return;
+  }
+
+  try {
+    res.json(await getWordCount(req.params.id, session.rootResourcePath));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(502).json({ error: message });
+  }
+});
+
+sessionsRouter.get("/sessions/:id/sync/code", async (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session?.rootResourcePath) {
+    res.status(400).json({ error: "session has no resources set yet" });
+    return;
+  }
+
+  const file = (req.query.file as string | undefined) ?? session.rootResourcePath;
+  const line = Number(req.query.line);
+  const column = req.query.column ? Number(req.query.column) : 0;
+
+  if (!Number.isFinite(line)) {
+    res.status(400).json({ error: "line query param is required and must be a number" });
+    return;
+  }
+
+  try {
+    res.json(await syncCodeToPdf(req.params.id, file, line, column));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(502).json({ error: message });
+  }
+});
+
+sessionsRouter.get("/sessions/:id/sync/pdf", async (req, res) => {
+  const page = Number(req.query.page);
+  const h = Number(req.query.h);
+  const v = Number(req.query.v);
+
+  if (![page, h, v].every(Number.isFinite)) {
+    res.status(400).json({ error: "page, h, and v query params are required and must be numbers" });
+    return;
+  }
+
+  try {
+    res.json(await syncPdfToCode(req.params.id, page, h, v));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(502).json({ error: message });
