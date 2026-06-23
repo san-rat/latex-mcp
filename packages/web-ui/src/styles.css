@@ -56,6 +56,7 @@ body {
 
 .layout {
   flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 280px;
   overflow: hidden;
@@ -93,13 +94,16 @@ body {
 
 .pdf-canvas-wrapper {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   padding: 16px;
 }
 
-.pdf-canvas-wrapper canvas {
+.pdf-page-canvas {
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
   background: white;
 }

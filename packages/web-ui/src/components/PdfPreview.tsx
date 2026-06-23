@@ -10,13 +10,13 @@ interface PdfPreviewProps {
 }
 
 export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
-  const [page, setPage] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pageCount, setPageCount] = useState(0);
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Load the document whenever a new PDF URL arrives (each compile produces one).
   useEffect(() => {
     if (!pdfUrl) return;
     let cancelled = false;
@@ -27,7 +27,6 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
         if (cancelled) return;
         pdfRef.current = pdf;
         setPageCount(pdf.numPages);
-        setPage((p) => Math.min(p, pdf.numPages) || 1);
         setVersion((v) => v + 1);
       },
       (err) => {
@@ -40,26 +39,42 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     };
   }, [pdfUrl]);
 
+  // Render every page into its own canvas once they're mounted. Queries the DOM
+  // directly off a single stable container ref rather than per-canvas callback
+  // refs, since React (especially under StrictMode's double-invoke in dev) can
+  // churn array-index callback refs in ways that leave stale/null entries.
   useEffect(() => {
     const pdf = pdfRef.current;
-    const canvas = canvasRef.current;
-    if (!pdf || !canvas || page < 1 || page > pdf.numPages) return;
-
+    const container = containerRef.current;
+    if (!pdf || !container || pageCount === 0) return;
     let cancelled = false;
-    pdf.getPage(page).then((pdfPage) => {
-      if (cancelled) return;
-      const viewport = pdfPage.getViewport({ scale: 1.3 });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      void pdfPage.render({ canvasContext: context, viewport }).promise;
-    });
+
+    (async () => {
+      const canvases = container.querySelectorAll<HTMLCanvasElement>(".pdf-page-canvas");
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        if (cancelled) return;
+        const canvas = canvases[pageNum - 1];
+        if (!canvas) continue;
+        try {
+          const page = await pdf.getPage(pageNum);
+          if (cancelled) return;
+          const viewport = page.getViewport({ scale: 1.3 });
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const context = canvas.getContext("2d");
+          if (!context) continue;
+          await page.render({ canvasContext: context, viewport }).promise;
+        } catch {
+          // A render on this canvas may have been superseded by a newer one
+          // (e.g. React's dev-mode double-invoke of effects); safe to ignore.
+        }
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [page, version]);
+  }, [pageCount, version]);
 
   async function handleDownload() {
     if (!pdfUrl) return;
@@ -88,24 +103,17 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
   return (
     <div className="pdf-preview">
       <div className="pdf-toolbar">
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-          Prev
-        </button>
         <span>
-          Page {page} / {pageCount || "?"}
+          {pageCount} page{pageCount === 1 ? "" : "s"}
         </span>
-        <button
-          onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-          disabled={page >= pageCount}
-        >
-          Next
-        </button>
         <button className="download-button" onClick={handleDownload}>
           Download PDF
         </button>
       </div>
-      <div className="pdf-canvas-wrapper">
-        <canvas ref={canvasRef} />
+      <div className="pdf-canvas-wrapper" ref={containerRef}>
+        {Array.from({ length: pageCount }, (_, i) => (
+          <canvas key={i} className="pdf-page-canvas" />
+        ))}
       </div>
     </div>
   );
