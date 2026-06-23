@@ -61,6 +61,22 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     };
   }, [page, version]);
 
+  async function handleDownload() {
+    if (!pdfUrl) return;
+    // The backend runs on a different origin than the UI, and browsers ignore
+    // the <a download> attribute for cross-origin links (it just opens the
+    // PDF instead of saving it). Fetching as a blob and downloading that
+    // works regardless of origin.
+    const res = await fetch(pdfUrl);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "output.pdf";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+
   if (!pdfUrl) {
     return <div className="pdf-placeholder">Compile to see a preview</div>;
   }
@@ -83,6 +99,9 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           disabled={page >= pageCount}
         >
           Next
+        </button>
+        <button className="download-button" onClick={handleDownload}>
+          Download PDF
         </button>
       </div>
       <div className="pdf-canvas-wrapper">

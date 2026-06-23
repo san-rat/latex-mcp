@@ -87,6 +87,10 @@ body {
   font-size: 12px;
 }
 
+.pdf-toolbar .download-button {
+  margin-left: auto;
+}
+
 .pdf-canvas-wrapper {
   flex: 1;
   overflow: auto;
