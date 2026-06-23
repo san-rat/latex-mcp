@@ -9,3 +9,5 @@ build/
 .vite/
 out/
 coverage/
+vendor/
+clsi-data/

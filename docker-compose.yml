@@ -1,0 +1,20 @@
+services:
+  clsi:
+    build:
+      context: ./vendor/overleaf
+      dockerfile: services/clsi/Dockerfile
+      target: with-texlive
+    image: latex-mcp-clsi:local
+    ports:
+      - "3013:3013"
+    environment:
+      # Must be 0.0.0.0 inside the container, otherwise it only binds loopback
+      # inside the container's own network namespace and the host port mapping
+      # can't reach it.
+      LISTEN_ADDRESS: "0.0.0.0"
+      COMPILE_SIZE_LIMIT: "50mb"
+    volumes:
+      - ./clsi-data/compiles:/overleaf/services/clsi/compiles
+      - ./clsi-data/output:/overleaf/services/clsi/output
+      - ./clsi-data/cache:/overleaf/services/clsi/cache
+    restart: unless-stopped
