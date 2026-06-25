@@ -152,6 +152,27 @@ export default function App() {
     }
   }, [fileHandle, source, handleSaveAs]);
 
+  // Keyboard shortcuts: Ctrl/Cmd+S to save, Ctrl/Cmd+Enter to compile.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const isMod = event.ctrlKey || event.metaKey;
+      if (!isMod) return;
+      if (event.key === "s") {
+        event.preventDefault();
+        void handleSave();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        void handleCompile();
+      }
+    }
+    // Capture phase: CodeMirror's own key handling can stop propagation for
+    // keys it considers its own once the event reaches the bubble phase, so a
+    // bubble-phase listener on window can silently miss these while the
+    // editor has focus.
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleSave, handleCompile]);
+
   return (
     <div className="app">
       <header className="toolbar">
@@ -164,7 +185,7 @@ export default function App() {
           <option value="xelatex">xelatex</option>
           <option value="lualatex">lualatex</option>
         </select>
-        <button onClick={handleCompile} disabled={!sessionId || compiling}>
+        <button onClick={handleCompile} disabled={!sessionId || compiling} title="Compile (Ctrl/Cmd+Enter)">
           {compiling ? "Compiling…" : "Compile"}
         </button>
         <div className="join-session">

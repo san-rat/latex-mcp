@@ -25,7 +25,9 @@ export function Sidebar({ open, onToggle, fileName, onNewFile, onOpenFile, onSav
           </div>
           <button onClick={onNewFile}>New File</button>
           <button onClick={onOpenFile}>Open File…</button>
-          <button onClick={onSave}>Save</button>
+          <button onClick={onSave} title="Save (Ctrl/Cmd+S)">
+            Save
+          </button>
           <button onClick={onSaveAs}>Save As…</button>
         </div>
       )}
