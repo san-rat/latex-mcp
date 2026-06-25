@@ -18,6 +18,7 @@ export function Editor({ value, onChange, editable, onReady }: EditorProps) {
       value={value}
       height="100%"
       editable={editable}
+      theme="dark"
       extensions={[latexLanguage]}
       onChange={onChange}
       onCreateEditor={(view) => onReady?.(view)}

@@ -262,6 +262,7 @@ button:disabled {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--bg-app);
 }
 
 .editor-toolbar {
