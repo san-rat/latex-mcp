@@ -1,3 +1,17 @@
+:root {
+  --bg-app: #1e2228;
+  --bg-surface: #2a2f37;
+  --bg-surface-2: #343a44;
+  --bg-pdf: #4a4f57;
+  --text: #e8eaed;
+  --text-dim: #aeb4bc;
+  --border: #3c424c;
+  --accent: #4a90d9;
+  --danger: #ff6b6b;
+  --warning: #e6a23c;
+  --success: #67c587;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -11,7 +25,8 @@ body,
 
 body {
   font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-  color: #1a1a1a;
+  color: var(--text);
+  background: var(--bg-app);
 }
 
 .app {
@@ -25,8 +40,8 @@ body {
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #2f3640;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text);
   flex-shrink: 0;
 }
 
@@ -35,6 +50,10 @@ body {
 .toolbar input {
   font-size: 13px;
   padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-surface-2);
+  color: var(--text);
 }
 
 .session-id {
@@ -51,12 +70,12 @@ body {
 }
 
 .join-error {
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 12px;
 }
 
 .error-message {
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 12px;
 }
 
@@ -69,8 +88,8 @@ body {
 
 .sidebar {
   flex-shrink: 0;
-  background: #23272e;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   transition: width 0.15s ease;
@@ -88,7 +107,7 @@ body {
 .sidebar-toggle {
   background: none;
   border: none;
-  color: white;
+  color: var(--text);
   padding: 8px;
   cursor: pointer;
   font-size: 14px;
@@ -111,7 +130,7 @@ body {
 }
 
 .dirty-dot {
-  color: #e6a23c;
+  color: var(--warning);
   margin-right: 4px;
 }
 
@@ -120,6 +139,20 @@ body {
   padding: 6px 8px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.sidebar-content > button,
+.editor-toolbar button,
+.pdf-toolbar button {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-surface-2);
+  color: var(--text);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .file-list {
@@ -136,7 +169,7 @@ body {
 }
 
 .file-item.active {
-  background: #3a414b;
+  background: var(--bg-surface-2);
 }
 
 .file-select {
@@ -160,8 +193,8 @@ body {
 .root-badge {
   margin-left: auto;
   border-radius: 3px;
-  background: #4a90d9;
-  color: white;
+  background: var(--accent);
+  color: var(--text);
   padding: 1px 4px;
   font-size: 9px;
 }
@@ -175,8 +208,8 @@ body {
 
 .file-actions button {
   border: 0;
-  background: #343a44;
-  color: white;
+  background: var(--bg-surface-2);
+  color: var(--text);
   padding: 2px 5px;
   font-size: 10px;
 }
@@ -188,7 +221,7 @@ body {
 .sidebar-divider {
   height: 1px;
   margin: 3px 0;
-  background: #3c424c;
+  background: var(--border);
 }
 
 .layout {
@@ -199,18 +232,18 @@ body {
 }
 
 .gutter {
-  background: var(--border, #ccc);
+  background: var(--border);
   cursor: col-resize;
   touch-action: none;
 }
 
 .gutter:hover {
-  background: var(--accent, #4a90d9);
+  background: var(--accent);
 }
 
 .pane {
   overflow: auto;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--border);
   height: 100%;
 }
 
@@ -224,7 +257,8 @@ body {
   display: flex;
   justify-content: flex-end;
   padding: 4px 6px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface-2);
   flex-shrink: 0;
 }
 
@@ -238,7 +272,7 @@ body {
 }
 
 .preview-pane {
-  background: #525659;
+  background: var(--bg-pdf);
   display: flex;
   flex-direction: column;
 }
@@ -248,8 +282,8 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px;
-  background: #3a3d40;
-  color: white;
+  background: var(--bg-surface-2);
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -302,13 +336,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ddd;
+  color: var(--text-dim);
   font-size: 13px;
 }
 
 .diagnostics-pane {
   padding: 8px;
   font-size: 12px;
+  background: var(--bg-app);
 }
 
 .status-badge {
@@ -322,14 +357,14 @@ body {
 }
 
 .status-success {
-  background: #d4f4dd;
-  color: #1a7431;
+  background: var(--bg-surface-2);
+  color: var(--success);
 }
 
 .status-failure,
 .status-error {
-  background: #fde2e1;
-  color: #a3261b;
+  background: var(--bg-surface-2);
+  color: var(--danger);
 }
 
 .diagnostics-list {
@@ -342,9 +377,9 @@ body {
 }
 
 .diagnostic {
-  border-left: 3px solid #ccc;
+  border-left: 3px solid var(--border);
   padding: 4px 6px;
-  background: #f7f7f7;
+  background: var(--bg-surface);
 }
 
 .diagnostic[role="button"] {
@@ -352,15 +387,15 @@ body {
 }
 
 .diagnostic[role="button"]:hover {
-  background: #efefef;
+  background: var(--bg-surface-2);
 }
 
 .diagnostic-error {
-  border-left-color: #c0392b;
+  border-left-color: var(--danger);
 }
 
 .diagnostic-warning {
-  border-left-color: #d4a017;
+  border-left-color: var(--warning);
 }
 
 .diagnostic-severity {
@@ -373,19 +408,19 @@ body {
 .diagnostic-line {
   font-family: monospace;
   margin-right: 6px;
-  color: #555;
+  color: var(--text-dim);
 }
 
 .diagnostics-empty {
-  color: #888;
+  color: var(--text-dim);
 }
 
 .toast {
   position: fixed;
   bottom: 16px;
   right: 16px;
-  background: #333;
-  color: #fff;
+  background: var(--bg-surface-2);
+  color: var(--text);
   padding: 10px 14px;
   border-radius: 6px;
   font-size: 13px;
