@@ -6,6 +6,7 @@ import { Editor } from "./components/Editor.js";
 import { PdfPreview } from "./components/PdfPreview.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
+import { Toast } from "./components/Toast.js";
 import { openTexFile, saveAsTexFile, saveToHandle } from "./fileSystem.js";
 import { useSessionSocket } from "./useSessionSocket.js";
 
@@ -39,11 +40,20 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileName, setFileName] = useState("Untitled.tex");
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [pdfScrollTarget, setPdfScrollTarget] = useState<
     { page: number; v: number; nonce: number } | undefined
   >(undefined);
   const editorViewRef = useRef<EditorView | null>(null);
+  const compilingRef = useRef(false);
+  const toastTimerRef = useRef<number | undefined>(undefined);
   const isDirty = source !== savedContent;
+
+  const showToast = useCallback((message: string) => {
+    window.clearTimeout(toastTimerRef.current);
+    setToast(message);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const jumpToLine = useCallback((line: number) => {
     const view = editorViewRef.current;
@@ -121,6 +131,7 @@ export default function App() {
   // Live updates from the backend, regardless of whether the compile was
   // triggered from this UI or from an LLM via MCP.
   useSessionSocket(sessionId, (result) => {
+    const external = !compilingRef.current;
     setLastResult(result);
     setCompiling(false);
     if (result.status === "success" && sessionId) {
@@ -131,7 +142,19 @@ export default function App() {
         if (session.resources[0]) setSource(session.resources[0].content);
       });
     }
+    if (external) showToast("Updated by another session");
   });
+
+  useEffect(() => {
+    compilingRef.current = compiling;
+  }, [compiling]);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(toastTimerRef.current);
+    },
+    []
+  );
 
   const handleCompile = useCallback(async () => {
     if (!sessionId) return;
@@ -310,6 +333,7 @@ export default function App() {
           </div>
         </main>
       </div>
+      {toast && <Toast message={toast} />}
     </div>
   );
 }
