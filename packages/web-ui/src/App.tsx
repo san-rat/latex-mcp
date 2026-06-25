@@ -29,6 +29,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [joinInput, setJoinInput] = useState("");
   const [source, setSource] = useState(DEFAULT_SOURCE);
+  const [savedContent, setSavedContent] = useState(DEFAULT_SOURCE);
   const [compiling, setCompiling] = useState(false);
   const [compiler, setCompiler] = useState<Compiler>("pdflatex");
   const [lastResult, setLastResult] = useState<CompileResult | undefined>(undefined);
@@ -37,6 +38,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileName, setFileName] = useState("Untitled.tex");
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const isDirty = source !== savedContent;
 
   // Bootstrap: join an existing session from the URL, or create a new one.
   useEffect(() => {
@@ -46,7 +48,10 @@ export default function App() {
         .getSession(existing)
         .then((session) => {
           setSessionId(session.sessionId);
-          if (session.resources[0]) setSource(session.resources[0].content);
+          if (session.resources[0]) {
+            setSource(session.resources[0].content);
+            setSavedContent(session.resources[0].content);
+          }
           if (session.lastCompileResult) {
             setLastResult(session.lastCompileResult);
             if (session.lastCompileResult.status === "success") {
@@ -108,6 +113,7 @@ export default function App() {
 
   const handleNewFile = useCallback(async () => {
     setSource(DEFAULT_SOURCE);
+    setSavedContent(DEFAULT_SOURCE);
     setFileName("Untitled.tex");
     setFileHandle(null);
     setErrorMessage(undefined);
@@ -119,6 +125,7 @@ export default function App() {
       const opened = await openTexFile();
       if (!opened) return;
       setSource(opened.content);
+      setSavedContent(opened.content);
       setFileName(opened.name);
       setFileHandle(opened.handle);
       setErrorMessage(undefined);
@@ -134,6 +141,7 @@ export default function App() {
       if (saved) {
         setFileName(saved.name);
         setFileHandle(saved.handle);
+        setSavedContent(source);
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to save file");
@@ -144,6 +152,7 @@ export default function App() {
     try {
       if (fileHandle) {
         await saveToHandle(fileHandle, source);
+        setSavedContent(source);
       } else {
         await handleSaveAs();
       }
@@ -172,6 +181,17 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [handleSave, handleCompile]);
+
+  useEffect(() => {
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (isDirty) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
 
   return (
     <div className="app">
@@ -204,6 +224,7 @@ export default function App() {
           open={sidebarOpen}
           onToggle={() => setSidebarOpen((v) => !v)}
           fileName={fileName}
+          dirty={isDirty}
           onNewFile={handleNewFile}
           onOpenFile={handleOpenFile}
           onSave={handleSave}

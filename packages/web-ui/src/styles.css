@@ -105,6 +105,11 @@ body {
   margin-bottom: 4px;
 }
 
+.dirty-dot {
+  color: #e6a23c;
+  margin-right: 4px;
+}
+
 .sidebar-content button {
   text-align: left;
   padding: 6px 8px;
