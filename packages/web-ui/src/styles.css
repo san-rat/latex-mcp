@@ -102,13 +102,12 @@ body {
   padding: 0 8px 8px;
 }
 
-.sidebar-filename {
+.sidebar-section-title {
   font-size: 11px;
   opacity: 0.7;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .dirty-dot {
@@ -121,6 +120,75 @@ body {
   padding: 6px 8px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-item {
+  border-radius: 4px;
+}
+
+.file-item.active {
+  background: #3a414b;
+}
+
+.file-select {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.root-badge {
+  margin-left: auto;
+  border-radius: 3px;
+  background: #4a90d9;
+  color: white;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.file-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 0 4px 4px;
+}
+
+.file-actions button {
+  border: 0;
+  background: #343a44;
+  color: white;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+
+.add-file-button {
+  margin-bottom: 2px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  margin: 3px 0;
+  background: #3c424c;
 }
 
 .layout {

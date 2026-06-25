@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { EditorView } from "@codemirror/view";
-import type { CompileResult, Compiler } from "@latex-mcp/shared";
+import type { CompileResult, Compiler, ResourceFile } from "@latex-mcp/shared";
 import * as api from "./api.js";
 import { Editor } from "./components/Editor.js";
 import { PdfPreview } from "./components/PdfPreview.js";
@@ -18,10 +18,15 @@ Edit this source, then click Compile.
 \\end{document}
 `;
 const MIN_PANE_WIDTH = 200;
+const DEFAULT_FILES: ResourceFile[] = [{ path: "main.tex", content: DEFAULT_SOURCE }];
 
 function storedPaneWidth(key: string, fallback: number): number {
   const value = Number(window.localStorage.getItem(key));
   return Number.isFinite(value) && value >= MIN_PANE_WIDTH ? value : fallback;
+}
+
+function resourcesEqual(left: ResourceFile[], right: ResourceFile[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function getSessionIdFromUrl(): string | undefined {
@@ -38,16 +43,16 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState<string | undefined>(undefined);
-  const [source, setSource] = useState(DEFAULT_SOURCE);
-  const [savedContent, setSavedContent] = useState(DEFAULT_SOURCE);
+  const [files, setFiles] = useState<ResourceFile[]>(DEFAULT_FILES);
+  const [savedFiles, setSavedFiles] = useState<ResourceFile[]>(DEFAULT_FILES);
+  const [activePath, setActivePath] = useState("main.tex");
+  const [rootPath, setRootPath] = useState("main.tex");
   const [compiling, setCompiling] = useState(false);
   const [compiler, setCompiler] = useState<Compiler>("pdflatex");
   const [lastResult, setLastResult] = useState<CompileResult | undefined>(undefined);
   const [pdfUrlValue, setPdfUrlValue] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [fileName, setFileName] = useState("Untitled.tex");
-  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [editorW, setEditorW] = useState(() => storedPaneWidth("latex-mcp-editor-width", 480));
   const [diagW, setDiagW] = useState(() => storedPaneWidth("latex-mcp-diagnostics-width", 280));
@@ -57,7 +62,9 @@ export default function App() {
   const editorViewRef = useRef<EditorView | null>(null);
   const compilingRef = useRef(false);
   const toastTimerRef = useRef<number | undefined>(undefined);
-  const isDirty = source !== savedContent;
+  const fileHandlesRef = useRef<Map<string, FileSystemFileHandle>>(new Map());
+  const activeContent = files.find((file) => file.path === activePath)?.content ?? "";
+  const isDirty = !resourcesEqual(files, savedFiles);
 
   const showToast = useCallback((message: string) => {
     window.clearTimeout(toastTimerRef.current);
@@ -79,12 +86,19 @@ export default function App() {
       if (!sessionId) return;
       try {
         const positions = await api.syncPdfToCode(sessionId, page, h, v);
-        if (positions[0]?.line) jumpToLine(positions[0].line);
+        const position = positions[0];
+        if (!position?.line) return;
+        if (files.some((file) => file.path === position.file) && position.file !== activePath) {
+          setActivePath(position.file);
+          window.setTimeout(() => jumpToLine(position.line), 0);
+        } else {
+          jumpToLine(position.line);
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "PDF sync failed");
       }
     },
-    [sessionId, jumpToLine]
+    [sessionId, files, activePath, jumpToLine]
   );
 
   const handleSyncToPdf = useCallback(async () => {
@@ -93,7 +107,7 @@ export default function App() {
     if (!view) return;
     const line = view.state.doc.lineAt(view.state.selection.main.head).number;
     try {
-      const positions = await api.syncCodeToPdf(sessionId, line);
+      const positions = await api.syncCodeToPdf(sessionId, line, 0, activePath);
       const position = positions[0];
       if (!position) {
         setErrorMessage("No PDF position found for the current source line");
@@ -108,7 +122,7 @@ export default function App() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Source sync failed");
     }
-  }, [sessionId]);
+  }, [sessionId, activePath]);
 
   const startResize = useCallback(
     (side: "editor" | "diagnostics") => (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -151,9 +165,12 @@ export default function App() {
         .getSession(existing)
         .then((session) => {
           setSessionId(session.sessionId);
-          if (session.resources[0]) {
-            setSource(session.resources[0].content);
-            setSavedContent(session.resources[0].content);
+          if (session.resources.length > 0) {
+            const sessionRoot = session.rootResourcePath ?? session.resources[0].path;
+            setFiles(session.resources);
+            setSavedFiles(session.resources);
+            setRootPath(sessionRoot);
+            setActivePath(sessionRoot);
           }
           if (session.lastCompileResult) {
             setLastResult(session.lastCompileResult);
@@ -182,7 +199,13 @@ export default function App() {
     }
     if (sessionId) {
       api.getSession(sessionId).then((session) => {
-        if (session.resources[0]) setSource(session.resources[0].content);
+        if (session.resources.length === 0) return;
+        const sessionRoot = session.rootResourcePath ?? session.resources[0].path;
+        setFiles(session.resources);
+        setRootPath(sessionRoot);
+        setActivePath((current) =>
+          session.resources.some((file) => file.path === current) ? current : sessionRoot
+        );
       });
     }
     if (external) showToast("Updated by another session");
@@ -204,14 +227,14 @@ export default function App() {
     setCompiling(true);
     setErrorMessage(undefined);
     try {
-      await api.setResources(sessionId, source);
+      await api.setResources(sessionId, files, rootPath);
       await api.compile(sessionId, compiler);
       // Result + PDF refresh arrive via the WebSocket broadcast.
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Compile failed");
       setCompiling(false);
     }
-  }, [sessionId, source, compiler]);
+  }, [sessionId, files, rootPath, compiler]);
 
   const handleJoin = useCallback(async () => {
     const id = joinInput.trim();
@@ -235,10 +258,12 @@ export default function App() {
   }, []);
 
   const handleNewFile = useCallback(async () => {
-    setSource(DEFAULT_SOURCE);
-    setSavedContent(DEFAULT_SOURCE);
-    setFileName("Untitled.tex");
-    setFileHandle(null);
+    const nextFiles = [{ path: "main.tex", content: DEFAULT_SOURCE }];
+    setFiles(nextFiles);
+    setSavedFiles(nextFiles);
+    setActivePath("main.tex");
+    setRootPath("main.tex");
+    fileHandlesRef.current.clear();
     setErrorMessage(undefined);
     await startFreshSession();
   }, [startFreshSession]);
@@ -247,10 +272,13 @@ export default function App() {
     try {
       const opened = await openTexFile();
       if (!opened) return;
-      setSource(opened.content);
-      setSavedContent(opened.content);
-      setFileName(opened.name);
-      setFileHandle(opened.handle);
+      const nextFiles = [{ path: opened.name, content: opened.content }];
+      setFiles(nextFiles);
+      setSavedFiles(nextFiles);
+      setActivePath(opened.name);
+      setRootPath(opened.name);
+      fileHandlesRef.current.clear();
+      if (opened.handle) fileHandlesRef.current.set(opened.name, opened.handle);
       setErrorMessage(undefined);
       await startFreshSession();
     } catch (error) {
@@ -260,29 +288,79 @@ export default function App() {
 
   const handleSaveAs = useCallback(async () => {
     try {
-      const saved = await saveAsTexFile(source, fileName);
+      const saved = await saveAsTexFile(activeContent, activePath);
       if (saved) {
-        setFileName(saved.name);
-        setFileHandle(saved.handle);
-        setSavedContent(source);
+        if (saved.handle) fileHandlesRef.current.set(activePath, saved.handle);
+        setSavedFiles((current) => {
+          const existing = current.findIndex((file) => file.path === activePath);
+          if (existing === -1) return [...current, { path: activePath, content: activeContent }];
+          return current.map((file) =>
+            file.path === activePath ? { ...file, content: activeContent } : file
+          );
+        });
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to save file");
     }
-  }, [source, fileName]);
+  }, [activeContent, activePath]);
 
   const handleSave = useCallback(async () => {
     try {
+      const fileHandle = fileHandlesRef.current.get(activePath);
       if (fileHandle) {
-        await saveToHandle(fileHandle, source);
-        setSavedContent(source);
+        await saveToHandle(fileHandle, activeContent);
+        setSavedFiles((current) =>
+          current.map((file) =>
+            file.path === activePath ? { ...file, content: activeContent } : file
+          )
+        );
       } else {
         await handleSaveAs();
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to save file");
     }
-  }, [fileHandle, source, handleSaveAs]);
+  }, [activeContent, activePath, handleSaveAs]);
+
+  const handleAddFile = useCallback(() => {
+    const path = window.prompt("New file name (.tex or .bib):")?.trim();
+    if (!path) return;
+    if (!/\.(tex|bib)$/i.test(path)) {
+      setErrorMessage("File name must end in .tex or .bib");
+      return;
+    }
+    if (files.some((file) => file.path === path)) {
+      setErrorMessage("A file with that path already exists");
+      return;
+    }
+    setFiles((current) => [...current, { path, content: "" }]);
+    setActivePath(path);
+    setErrorMessage(undefined);
+  }, [files]);
+
+  const handleDeleteFile = useCallback(
+    (path: string) => {
+      if (path === rootPath) {
+        setErrorMessage("The root file cannot be deleted");
+        return;
+      }
+      setFiles((current) => current.filter((file) => file.path !== path));
+      setSavedFiles((current) => current.filter((file) => file.path !== path));
+      fileHandlesRef.current.delete(path);
+      if (activePath === path) setActivePath(rootPath);
+      setErrorMessage(undefined);
+    },
+    [activePath, rootPath]
+  );
+
+  const handleSetRoot = useCallback(
+    (path: string) => {
+      if (!files.some((file) => file.path === path)) return;
+      setRootPath(path);
+      setErrorMessage(undefined);
+    },
+    [files]
+  );
 
   // Keyboard shortcuts: Ctrl/Cmd+S to save, Ctrl/Cmd+Enter to compile.
   useEffect(() => {
@@ -358,8 +436,14 @@ export default function App() {
         <Sidebar
           open={sidebarOpen}
           onToggle={() => setSidebarOpen((v) => !v)}
-          fileName={fileName}
+          files={files}
+          activePath={activePath}
+          rootPath={rootPath}
           dirty={isDirty}
+          onSelectFile={setActivePath}
+          onAddFile={handleAddFile}
+          onDeleteFile={handleDeleteFile}
+          onSetRoot={handleSetRoot}
           onNewFile={handleNewFile}
           onOpenFile={handleOpenFile}
           onSave={handleSave}
@@ -379,8 +463,12 @@ export default function App() {
             </div>
             <div className="editor-container">
               <Editor
-                value={source}
-                onChange={setSource}
+                value={activeContent}
+                onChange={(content) =>
+                  setFiles((current) =>
+                    current.map((file) => (file.path === activePath ? { ...file, content } : file))
+                  )
+                }
                 editable={!compiling}
                 onReady={(view) => {
                   editorViewRef.current = view;
