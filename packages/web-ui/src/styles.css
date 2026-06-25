@@ -439,3 +439,60 @@ button:disabled {
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
+
+@media (max-width: 900px) {
+  .app {
+    min-height: 100vh;
+    height: auto;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .join-session {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+
+  .body {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .sidebar,
+  .sidebar-open,
+  .sidebar-collapsed {
+    width: 100%;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .pane {
+    width: 100% !important;
+    height: auto;
+    min-height: 240px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editor-pane {
+    min-height: 360px;
+  }
+
+  .preview-pane {
+    min-height: 360px;
+  }
+
+  .pdf-canvas-wrapper {
+    max-height: 70vh;
+  }
+
+  .gutter {
+    display: none;
+  }
+}

@@ -30,6 +30,20 @@ function resourcesEqual(left: ResourceFile[], right: ResourceFile[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [query]);
+
+  return matches;
+}
+
 function getSessionIdFromUrl(): string | undefined {
   return new URLSearchParams(window.location.search).get("session") ?? undefined;
 }
@@ -64,6 +78,7 @@ export default function App() {
   const compilingRef = useRef(false);
   const toastTimerRef = useRef<number | undefined>(undefined);
   const fileHandlesRef = useRef<Map<string, FileSystemFileHandle>>(new Map());
+  const isNarrow = useMediaQuery("(max-width: 900px)");
   const activeContent = files.find((file) => file.path === activePath)?.content ?? "";
   const isDirty = !resourcesEqual(files, savedFiles);
 
@@ -458,9 +473,13 @@ export default function App() {
         />
         <main
           className="layout"
-          style={{
-            gridTemplateColumns: `${editorW}px 6px minmax(0, 1fr) 6px ${diagW}px`,
-          }}
+          style={
+            isNarrow
+              ? undefined
+              : {
+                  gridTemplateColumns: `${editorW}px 6px minmax(0, 1fr) 6px ${diagW}px`,
+                }
+          }
         >
           <div className="pane editor-pane">
             <div className="editor-toolbar">
@@ -488,7 +507,7 @@ export default function App() {
               />
             </div>
           </div>
-          <div className="gutter" onPointerDown={startResize("editor")} />
+          {!isNarrow && <div className="gutter" onPointerDown={startResize("editor")} />}
           <div className="pane preview-pane">
             <PdfPreview
               pdfUrl={pdfUrlValue}
@@ -496,7 +515,7 @@ export default function App() {
               scrollTarget={pdfScrollTarget}
             />
           </div>
-          <div className="gutter" onPointerDown={startResize("diagnostics")} />
+          {!isNarrow && <div className="gutter" onPointerDown={startResize("diagnostics")} />}
           <div className="pane diagnostics-pane">
             <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} onJump={jumpToLine} />
           </div>
