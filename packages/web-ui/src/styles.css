@@ -45,8 +45,14 @@ body {
 
 .join-session {
   display: flex;
+  align-items: center;
   gap: 4px;
   margin-left: auto;
+}
+
+.join-error {
+  color: #ff6b6b;
+  font-size: 12px;
 }
 
 .error-message {

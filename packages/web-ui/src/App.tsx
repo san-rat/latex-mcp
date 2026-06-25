@@ -37,6 +37,7 @@ function setSessionIdInUrl(sessionId: string): void {
 export default function App() {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [joinInput, setJoinInput] = useState("");
+  const [joinError, setJoinError] = useState<string | undefined>(undefined);
   const [source, setSource] = useState(DEFAULT_SOURCE);
   const [savedContent, setSavedContent] = useState(DEFAULT_SOURCE);
   const [compiling, setCompiling] = useState(false);
@@ -212,10 +213,17 @@ export default function App() {
     }
   }, [sessionId, source, compiler]);
 
-  const handleJoin = useCallback(() => {
-    if (!joinInput.trim()) return;
-    setSessionIdInUrl(joinInput.trim());
-    window.location.reload();
+  const handleJoin = useCallback(async () => {
+    const id = joinInput.trim();
+    if (!id) return;
+    setJoinError(undefined);
+    try {
+      await api.getSession(id);
+      setSessionIdInUrl(id);
+      window.location.reload();
+    } catch {
+      setJoinError("No session found with that id.");
+    }
   }, [joinInput]);
 
   const startFreshSession = useCallback(async () => {
@@ -335,9 +343,13 @@ export default function App() {
           <input
             placeholder="Join session id…"
             value={joinInput}
-            onChange={(e) => setJoinInput(e.target.value)}
+            onChange={(e) => {
+              setJoinInput(e.target.value);
+              setJoinError(undefined);
+            }}
           />
           <button onClick={handleJoin}>Join</button>
+          {joinError && <span className="join-error">{joinError}</span>}
         </div>
         {errorMessage && <span className="error-message">{errorMessage}</span>}
       </header>
