@@ -72,13 +72,18 @@ export function Sidebar({
                     className="file-select"
                     onClick={() => onSelectFile(file.path)}
                     title={file.path}
+                    aria-current={isActive ? "page" : undefined}
                   >
                     <span className="file-name">{file.path}</span>
                     {isRoot && <span className="root-badge">main</span>}
                   </button>
                   <div className="file-actions">
                     {!isRoot && file.path.toLowerCase().endsWith(".tex") && (
-                      <button onClick={() => onSetRoot(file.path)} title={`Set ${file.path} as root`}>
+                      <button
+                        onClick={() => onSetRoot(file.path)}
+                        title={`Set ${file.path} as root`}
+                        aria-label={`Set ${file.path} as root file`}
+                      >
                         root
                       </button>
                     )}

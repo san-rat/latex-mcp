@@ -425,7 +425,11 @@ export default function App() {
         <span className="session-id" title={sessionId}>
           session: {sessionId ? `${sessionId.slice(0, 8)}…` : "creating…"}
         </span>
-        <select value={compiler} onChange={(e) => setCompiler(e.target.value as Compiler)}>
+        <select
+          aria-label="LaTeX compiler"
+          value={compiler}
+          onChange={(e) => setCompiler(e.target.value as Compiler)}
+        >
           <option value="pdflatex">pdflatex</option>
           <option value="xelatex">xelatex</option>
           <option value="lualatex">lualatex</option>
@@ -441,6 +445,7 @@ export default function App() {
         </button>
         <div className="join-session">
           <input
+            aria-label="Session id to join"
             placeholder="Join session id…"
             value={joinInput}
             onChange={(e) => {
@@ -449,9 +454,17 @@ export default function App() {
             }}
           />
           <button onClick={handleJoin}>Join</button>
-          {joinError && <span className="join-error">{joinError}</span>}
+          {joinError && (
+            <span className="join-error" role="alert">
+              {joinError}
+            </span>
+          )}
         </div>
-        {errorMessage && <span className="error-message">{errorMessage}</span>}
+        {errorMessage && (
+          <span className="error-message" role="alert">
+            {errorMessage}
+          </span>
+        )}
       </header>
 
       <div className="body">
@@ -481,7 +494,7 @@ export default function App() {
                 }
           }
         >
-          <div className="pane editor-pane">
+          <div className="pane editor-pane" role="region" aria-label="LaTeX source">
             <div className="editor-toolbar">
               <button
                 className="icon-button"
@@ -508,7 +521,7 @@ export default function App() {
             </div>
           </div>
           {!isNarrow && <div className="gutter" onPointerDown={startResize("editor")} />}
-          <div className="pane preview-pane">
+          <div className="pane preview-pane" role="region" aria-label="PDF preview">
             <PdfPreview
               pdfUrl={pdfUrlValue}
               onPdfClick={handlePdfClick}
@@ -516,7 +529,7 @@ export default function App() {
             />
           </div>
           {!isNarrow && <div className="gutter" onPointerDown={startResize("diagnostics")} />}
-          <div className="pane diagnostics-pane">
+          <div className="pane diagnostics-pane" role="region" aria-label="Compile diagnostics">
             <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} onJump={jumpToLine} />
           </div>
         </main>

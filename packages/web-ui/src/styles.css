@@ -7,13 +7,18 @@
   --text-dim: #aeb4bc;
   --border: #3c424c;
   --accent: #4a90d9;
-  --danger: #ff6b6b;
+  --danger: #ff7f7f;
   --warning: #e6a23c;
   --success: #67c587;
 }
 
 * {
   box-sizing: border-box;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 button svg {

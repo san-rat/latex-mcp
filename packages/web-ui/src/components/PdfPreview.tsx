@@ -163,7 +163,20 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
           >
             <MinusIcon />
           </button>
-          <span className="zoom-level" title="Reset zoom" onClick={resetZoom}>
+          <span
+            className="zoom-level"
+            title="Reset zoom"
+            role="button"
+            tabIndex={0}
+            aria-label="Reset PDF zoom"
+            onClick={resetZoom}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                resetZoom();
+              }
+            }}
+          >
             {Math.round((scale / DEFAULT_SCALE) * 100)}%
           </span>
           <button
