@@ -1,4 +1,4 @@
-import type { Compiler, SessionInfo } from "@latex-mcp/shared";
+import type { CodePosition, Compiler, PdfPosition, SessionInfo } from "@latex-mcp/shared";
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://localhost:4000";
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, "ws");
@@ -45,6 +45,29 @@ export async function compile(sessionId: string, compiler: Compiler = "pdflatex"
     throw new Error(data?.error ?? `Compile failed (${res.status})`);
   }
   return data;
+}
+
+export async function syncCodeToPdf(
+  sessionId: string,
+  line: number,
+  column = 0
+): Promise<PdfPosition[]> {
+  const params = new URLSearchParams({ line: String(line), column: String(column) });
+  const res = await fetch(`${BACKEND_URL}/sessions/${sessionId}/sync/code?${params}`);
+  if (!res.ok) throw new Error(`sync/code failed (${res.status})`);
+  return (await res.json()) as PdfPosition[];
+}
+
+export async function syncPdfToCode(
+  sessionId: string,
+  page: number,
+  h: number,
+  v: number
+): Promise<CodePosition[]> {
+  const params = new URLSearchParams({ page: String(page), h: String(h), v: String(v) });
+  const res = await fetch(`${BACKEND_URL}/sessions/${sessionId}/sync/pdf?${params}`);
+  if (!res.ok) throw new Error(`sync/pdf failed (${res.status})`);
+  return (await res.json()) as CodePosition[];
 }
 
 export function pdfUrl(sessionId: string): string {

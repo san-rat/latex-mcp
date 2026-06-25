@@ -39,6 +39,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileName, setFileName] = useState("Untitled.tex");
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const [pdfScrollTarget, setPdfScrollTarget] = useState<
+    { page: number; v: number; nonce: number } | undefined
+  >(undefined);
   const editorViewRef = useRef<EditorView | null>(null);
   const isDirty = source !== savedContent;
 
@@ -50,6 +53,42 @@ export default function App() {
     view.dispatch({ selection: { anchor: lineInfo.from }, scrollIntoView: true });
     view.focus();
   }, []);
+
+  const handlePdfClick = useCallback(
+    async (page: number, h: number, v: number) => {
+      if (!sessionId) return;
+      try {
+        const positions = await api.syncPdfToCode(sessionId, page, h, v);
+        if (positions[0]?.line) jumpToLine(positions[0].line);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "PDF sync failed");
+      }
+    },
+    [sessionId, jumpToLine]
+  );
+
+  const handleSyncToPdf = useCallback(async () => {
+    if (!sessionId) return;
+    const view = editorViewRef.current;
+    if (!view) return;
+    const line = view.state.doc.lineAt(view.state.selection.main.head).number;
+    try {
+      const positions = await api.syncCodeToPdf(sessionId, line);
+      const position = positions[0];
+      if (!position) {
+        setErrorMessage("No PDF position found for the current source line");
+        return;
+      }
+      setErrorMessage(undefined);
+      setPdfScrollTarget((current) => ({
+        page: position.page,
+        v: position.v,
+        nonce: (current?.nonce ?? 0) + 1,
+      }));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Source sync failed");
+    }
+  }, [sessionId]);
 
   // Bootstrap: join an existing session from the URL, or create a new one.
   useEffect(() => {
@@ -243,17 +282,28 @@ export default function App() {
         />
         <main className="layout">
           <div className="pane editor-pane">
-            <Editor
-              value={source}
-              onChange={setSource}
-              editable={!compiling}
-              onReady={(view) => {
-                editorViewRef.current = view;
-              }}
-            />
+            <div className="editor-toolbar">
+              <button onClick={handleSyncToPdf} disabled={!sessionId || !pdfUrlValue}>
+                Sync to PDF
+              </button>
+            </div>
+            <div className="editor-container">
+              <Editor
+                value={source}
+                onChange={setSource}
+                editable={!compiling}
+                onReady={(view) => {
+                  editorViewRef.current = view;
+                }}
+              />
+            </div>
           </div>
           <div className="pane preview-pane">
-            <PdfPreview pdfUrl={pdfUrlValue} />
+            <PdfPreview
+              pdfUrl={pdfUrlValue}
+              onPdfClick={handlePdfClick}
+              scrollTarget={pdfScrollTarget}
+            />
           </div>
           <div className="pane diagnostics-pane">
             <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} onJump={jumpToLine} />

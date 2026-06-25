@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, PageViewport } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -12,11 +12,14 @@ const SCALE_STEP = 0.1;
 
 interface PdfPreviewProps {
   pdfUrl?: string;
+  onPdfClick?: (page: number, h: number, v: number) => void;
+  scrollTarget?: { page: number; v: number; nonce: number };
 }
 
-export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
+export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps) {
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportsRef = useRef<Map<number, PageViewport>>(new Map());
   const [pageCount, setPageCount] = useState(0);
   const [version, setVersion] = useState(0);
   const [scale, setScale] = useState(DEFAULT_SCALE);
@@ -66,6 +69,7 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           const page = await pdf.getPage(pageNum);
           if (cancelled) return;
           const viewport = page.getViewport({ scale });
+          viewportsRef.current.set(pageNum, viewport);
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const context = canvas.getContext("2d");
@@ -83,6 +87,14 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
       cancelled = true;
     };
   }, [pageCount, version, scale]);
+
+  useEffect(() => {
+    if (!scrollTarget) return;
+    const canvas = containerRef.current?.querySelector<HTMLCanvasElement>(
+      `canvas[data-page="${scrollTarget.page}"]`
+    );
+    canvas?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [scrollTarget]);
 
   function zoomIn() {
     setScale((s) => Math.min(MAX_SCALE, Math.round((s + SCALE_STEP) * 100) / 100));
@@ -110,6 +122,21 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     link.download = "output.pdf";
     link.click();
     URL.revokeObjectURL(blobUrl);
+  }
+
+  function handlePdfClick(event: React.MouseEvent<HTMLDivElement>) {
+    const canvas = (event.target as HTMLElement).closest(
+      "canvas.pdf-page-canvas"
+    ) as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const page = Number(canvas.dataset.page);
+    const viewport = viewportsRef.current.get(page);
+    if (!viewport) return;
+    const rect = canvas.getBoundingClientRect();
+    const xDev = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const yDev = (event.clientY - rect.top) * (canvas.height / rect.height);
+    const [h, v] = viewport.convertToPdfPoint(xDev, yDev);
+    onPdfClick?.(page, h, v);
   }
 
   if (!pdfUrl) {
@@ -141,9 +168,9 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           Download PDF
         </button>
       </div>
-      <div className="pdf-canvas-wrapper" ref={containerRef}>
+      <div className="pdf-canvas-wrapper" ref={containerRef} onClick={handlePdfClick}>
         {Array.from({ length: pageCount }, (_, i) => (
-          <canvas key={i} className="pdf-page-canvas" />
+          <canvas key={i} className="pdf-page-canvas" data-page={i + 1} />
         ))}
       </div>
     </div>

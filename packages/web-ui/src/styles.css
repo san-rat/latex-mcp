@@ -133,6 +133,25 @@ body {
 
 .editor-pane {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 6px;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.editor-toolbar button {
+  font-size: 12px;
+}
+
+.editor-container {
+  flex: 1;
+  min-height: 0;
 }
 
 .preview-pane {
