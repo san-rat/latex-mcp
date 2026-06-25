@@ -16,6 +16,17 @@
   box-sizing: border-box;
 }
 
+button svg {
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 html,
 body,
 #root {

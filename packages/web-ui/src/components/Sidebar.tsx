@@ -1,4 +1,13 @@
 import type { ResourceFile } from "@latex-mcp/shared";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FileNewIcon,
+  FolderOpenIcon,
+  MinusIcon,
+  PlusIcon,
+  SaveIcon,
+} from "./icons.js";
 
 interface SidebarProps {
   open: boolean;
@@ -39,8 +48,9 @@ export function Sidebar({
         className="sidebar-toggle"
         onClick={onToggle}
         title={open ? "Collapse sidebar" : "Expand sidebar"}
+        aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
       >
-        {open ? "«" : "»"}
+        {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </button>
       {open && (
         <div className="sidebar-content">
@@ -73,8 +83,13 @@ export function Sidebar({
                       </button>
                     )}
                     {!isRoot && (
-                      <button onClick={() => onDeleteFile(file.path)} title={`Delete ${file.path}`}>
-                        ×
+                      <button
+                        className="icon-button"
+                        onClick={() => onDeleteFile(file.path)}
+                        title={`Delete ${file.path}`}
+                        aria-label={`Delete ${file.path}`}
+                      >
+                        <MinusIcon size={12} />
                       </button>
                     )}
                   </div>
@@ -82,16 +97,31 @@ export function Sidebar({
               );
             })}
           </ul>
-          <button className="add-file-button" onClick={onAddFile}>
-            + Add file
+          <button className="add-file-button icon-button" onClick={onAddFile}>
+            <PlusIcon />
+            Add file
           </button>
           <div className="sidebar-divider" />
-          <button onClick={onNewFile}>New File</button>
-          <button onClick={onOpenFile}>Open File…</button>
-          <button onClick={onSave} title="Save active file (Ctrl/Cmd+S)">
+          <button className="icon-button" onClick={onNewFile}>
+            <FileNewIcon />
+            New File
+          </button>
+          <button className="icon-button" onClick={onOpenFile}>
+            <FolderOpenIcon />
+            Open File…
+          </button>
+          <button
+            className="icon-button"
+            onClick={onSave}
+            title="Save active file (Ctrl/Cmd+S)"
+          >
+            <SaveIcon />
             Save
           </button>
-          <button onClick={onSaveAs}>Save As…</button>
+          <button className="icon-button" onClick={onSaveAs}>
+            <SaveIcon />
+            Save As…
+          </button>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PageViewport } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { DownloadIcon, MinusIcon, PlusIcon } from "./icons.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -154,17 +155,28 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
           {pageCount} page{pageCount === 1 ? "" : "s"}
         </span>
         <div className="zoom-controls">
-          <button onClick={zoomOut} disabled={scale <= MIN_SCALE} title="Zoom out">
-            −
+          <button
+            onClick={zoomOut}
+            disabled={scale <= MIN_SCALE}
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <MinusIcon />
           </button>
           <span className="zoom-level" title="Reset zoom" onClick={resetZoom}>
             {Math.round((scale / DEFAULT_SCALE) * 100)}%
           </span>
-          <button onClick={zoomIn} disabled={scale >= MAX_SCALE} title="Zoom in">
-            +
+          <button
+            onClick={zoomIn}
+            disabled={scale >= MAX_SCALE}
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <PlusIcon />
           </button>
         </div>
-        <button className="download-button" onClick={handleDownload}>
+        <button className="download-button icon-button" onClick={handleDownload}>
+          <DownloadIcon />
           Download PDF
         </button>
       </div>

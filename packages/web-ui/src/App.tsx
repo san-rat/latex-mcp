@@ -8,6 +8,7 @@ import { PdfPreview } from "./components/PdfPreview.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { Toast } from "./components/Toast.js";
+import { PlayIcon, SyncIcon } from "./components/icons.js";
 import { openTexFile, saveAsTexFile, saveToHandle } from "./fileSystem.js";
 import { useSessionSocket } from "./useSessionSocket.js";
 
@@ -414,7 +415,13 @@ export default function App() {
           <option value="xelatex">xelatex</option>
           <option value="lualatex">lualatex</option>
         </select>
-        <button onClick={handleCompile} disabled={!sessionId || compiling} title="Compile (Ctrl/Cmd+Enter)">
+        <button
+          className="icon-button"
+          onClick={handleCompile}
+          disabled={!sessionId || compiling}
+          title="Compile (Ctrl/Cmd+Enter)"
+        >
+          <PlayIcon />
           {compiling ? "Compiling…" : "Compile"}
         </button>
         <div className="join-session">
@@ -457,7 +464,12 @@ export default function App() {
         >
           <div className="pane editor-pane">
             <div className="editor-toolbar">
-              <button onClick={handleSyncToPdf} disabled={!sessionId || !pdfUrlValue}>
+              <button
+                className="icon-button"
+                onClick={handleSyncToPdf}
+                disabled={!sessionId || !pdfUrlValue}
+              >
+                <SyncIcon />
                 Sync to PDF
               </button>
             </div>
