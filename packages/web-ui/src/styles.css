@@ -150,6 +150,30 @@ body {
   margin-left: auto;
 }
 
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoom-controls button {
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.zoom-level {
+  font-family: monospace;
+  font-size: 12px;
+  min-width: 42px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
 .pdf-canvas-wrapper {
   flex: 1;
   min-height: 0;

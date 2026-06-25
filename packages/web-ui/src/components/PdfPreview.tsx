@@ -5,6 +5,11 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+const DEFAULT_SCALE = 1.3;
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 3;
+const SCALE_STEP = 0.1;
+
 interface PdfPreviewProps {
   pdfUrl?: string;
 }
@@ -14,6 +19,7 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageCount, setPageCount] = useState(0);
   const [version, setVersion] = useState(0);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
   const [error, setError] = useState<string | null>(null);
 
   // Load the document whenever a new PDF URL arrives (each compile produces one).
@@ -39,7 +45,8 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     };
   }, [pdfUrl]);
 
-  // Render every page into its own canvas once they're mounted. Queries the DOM
+  // Render every page into its own canvas once they're mounted, or re-render
+  // all of them at a new scale when the zoom level changes. Queries the DOM
   // directly off a single stable container ref rather than per-canvas callback
   // refs, since React (especially under StrictMode's double-invoke in dev) can
   // churn array-index callback refs in ways that leave stale/null entries.
@@ -58,7 +65,7 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
         try {
           const page = await pdf.getPage(pageNum);
           if (cancelled) return;
-          const viewport = page.getViewport({ scale: 1.3 });
+          const viewport = page.getViewport({ scale });
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const context = canvas.getContext("2d");
@@ -66,7 +73,8 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           await page.render({ canvasContext: context, viewport }).promise;
         } catch {
           // A render on this canvas may have been superseded by a newer one
-          // (e.g. React's dev-mode double-invoke of effects); safe to ignore.
+          // (e.g. React's dev-mode double-invoke of effects, or a zoom change
+          // landing mid-render); safe to ignore.
         }
       }
     })();
@@ -74,7 +82,19 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [pageCount, version]);
+  }, [pageCount, version, scale]);
+
+  function zoomIn() {
+    setScale((s) => Math.min(MAX_SCALE, Math.round((s + SCALE_STEP) * 100) / 100));
+  }
+
+  function zoomOut() {
+    setScale((s) => Math.max(MIN_SCALE, Math.round((s - SCALE_STEP) * 100) / 100));
+  }
+
+  function resetZoom() {
+    setScale(DEFAULT_SCALE);
+  }
 
   async function handleDownload() {
     if (!pdfUrl) return;
@@ -106,6 +126,17 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
         <span>
           {pageCount} page{pageCount === 1 ? "" : "s"}
         </span>
+        <div className="zoom-controls">
+          <button onClick={zoomOut} disabled={scale <= MIN_SCALE} title="Zoom out">
+            −
+          </button>
+          <span className="zoom-level" title="Reset zoom" onClick={resetZoom}>
+            {Math.round((scale / DEFAULT_SCALE) * 100)}%
+          </span>
+          <button onClick={zoomIn} disabled={scale >= MAX_SCALE} title="Zoom in">
+            +
+          </button>
+        </div>
         <button className="download-button" onClick={handleDownload}>
           Download PDF
         </button>
