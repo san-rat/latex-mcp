@@ -121,8 +121,17 @@ body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 280px;
   overflow: hidden;
+}
+
+.gutter {
+  background: var(--border, #ccc);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.gutter:hover {
+  background: var(--accent, #4a90d9);
 }
 
 .pane {

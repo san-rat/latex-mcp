@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { EditorView } from "@codemirror/view";
 import type { CompileResult, Compiler } from "@latex-mcp/shared";
 import * as api from "./api.js";
@@ -16,6 +17,12 @@ const DEFAULT_SOURCE = `\\documentclass{article}
 Edit this source, then click Compile.
 \\end{document}
 `;
+const MIN_PANE_WIDTH = 200;
+
+function storedPaneWidth(key: string, fallback: number): number {
+  const value = Number(window.localStorage.getItem(key));
+  return Number.isFinite(value) && value >= MIN_PANE_WIDTH ? value : fallback;
+}
 
 function getSessionIdFromUrl(): string | undefined {
   return new URLSearchParams(window.location.search).get("session") ?? undefined;
@@ -41,6 +48,8 @@ export default function App() {
   const [fileName, setFileName] = useState("Untitled.tex");
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [editorW, setEditorW] = useState(() => storedPaneWidth("latex-mcp-editor-width", 480));
+  const [diagW, setDiagW] = useState(() => storedPaneWidth("latex-mcp-diagnostics-width", 280));
   const [pdfScrollTarget, setPdfScrollTarget] = useState<
     { page: number; v: number; nonce: number } | undefined
   >(undefined);
@@ -99,6 +108,39 @@ export default function App() {
       setErrorMessage(error instanceof Error ? error.message : "Source sync failed");
     }
   }, [sessionId]);
+
+  const startResize = useCallback(
+    (side: "editor" | "diagnostics") => (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = side === "editor" ? editorW : diagW;
+      const maxWidth = Math.max(MIN_PANE_WIDTH, window.innerWidth - 400);
+      const clamp = (value: number) => Math.min(maxWidth, Math.max(MIN_PANE_WIDTH, value));
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      function onPointerMove(moveEvent: PointerEvent) {
+        const delta = moveEvent.clientX - startX;
+        if (side === "editor") {
+          setEditorW(clamp(startWidth + delta));
+        } else {
+          setDiagW(clamp(startWidth - delta));
+        }
+      }
+
+      function onPointerUp() {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+      }
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+    },
+    [editorW, diagW]
+  );
 
   // Bootstrap: join an existing session from the URL, or create a new one.
   useEffect(() => {
@@ -266,6 +308,14 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isDirty]);
 
+  useEffect(() => {
+    window.localStorage.setItem("latex-mcp-editor-width", String(editorW));
+  }, [editorW]);
+
+  useEffect(() => {
+    window.localStorage.setItem("latex-mcp-diagnostics-width", String(diagW));
+  }, [diagW]);
+
   return (
     <div className="app">
       <header className="toolbar">
@@ -303,7 +353,12 @@ export default function App() {
           onSave={handleSave}
           onSaveAs={handleSaveAs}
         />
-        <main className="layout">
+        <main
+          className="layout"
+          style={{
+            gridTemplateColumns: `${editorW}px 6px minmax(0, 1fr) 6px ${diagW}px`,
+          }}
+        >
           <div className="pane editor-pane">
             <div className="editor-toolbar">
               <button onClick={handleSyncToPdf} disabled={!sessionId || !pdfUrlValue}>
@@ -321,6 +376,7 @@ export default function App() {
               />
             </div>
           </div>
+          <div className="gutter" onPointerDown={startResize("editor")} />
           <div className="pane preview-pane">
             <PdfPreview
               pdfUrl={pdfUrlValue}
@@ -328,6 +384,7 @@ export default function App() {
               scrollTarget={pdfScrollTarget}
             />
           </div>
+          <div className="gutter" onPointerDown={startResize("diagnostics")} />
           <div className="pane diagnostics-pane">
             <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} onJump={jumpToLine} />
           </div>
