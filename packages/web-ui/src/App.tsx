@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { EditorView } from "@codemirror/view";
 import type { CompileResult, Compiler } from "@latex-mcp/shared";
 import * as api from "./api.js";
 import { Editor } from "./components/Editor.js";
@@ -38,7 +39,17 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileName, setFileName] = useState("Untitled.tex");
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
   const isDirty = source !== savedContent;
+
+  const jumpToLine = useCallback((line: number) => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const clamped = Math.max(1, Math.min(line, view.state.doc.lines));
+    const lineInfo = view.state.doc.line(clamped);
+    view.dispatch({ selection: { anchor: lineInfo.from }, scrollIntoView: true });
+    view.focus();
+  }, []);
 
   // Bootstrap: join an existing session from the URL, or create a new one.
   useEffect(() => {
@@ -232,13 +243,20 @@ export default function App() {
         />
         <main className="layout">
           <div className="pane editor-pane">
-            <Editor value={source} onChange={setSource} editable={!compiling} />
+            <Editor
+              value={source}
+              onChange={setSource}
+              editable={!compiling}
+              onReady={(view) => {
+                editorViewRef.current = view;
+              }}
+            />
           </div>
           <div className="pane preview-pane">
             <PdfPreview pdfUrl={pdfUrlValue} />
           </div>
           <div className="pane diagnostics-pane">
-            <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} />
+            <DiagnosticsPanel log={lastResult?.log} status={lastResult?.status} onJump={jumpToLine} />
           </div>
         </main>
       </div>
