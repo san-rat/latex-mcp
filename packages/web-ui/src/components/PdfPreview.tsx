@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import type { PDFDocumentProxy, PageViewport } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { DownloadIcon, MinusIcon, PlusIcon } from "./icons.js";
 
@@ -59,6 +59,7 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
     const container = containerRef.current;
     if (!pdf || !container || pageCount === 0) return;
     let cancelled = false;
+    const renderTasks: ReturnType<PDFPageProxy["render"]>[] = [];
 
     (async () => {
       const canvases = container.querySelectorAll<HTMLCanvasElement>(".pdf-page-canvas");
@@ -75,7 +76,9 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
           canvas.height = viewport.height;
           const context = canvas.getContext("2d");
           if (!context) continue;
-          await page.render({ canvasContext: context, viewport }).promise;
+          const task = page.render({ canvasContext: context, viewport });
+          renderTasks.push(task);
+          await task.promise;
         } catch {
           // A render on this canvas may have been superseded by a newer one
           // (e.g. React's dev-mode double-invoke of effects, or a zoom change
@@ -86,15 +89,30 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
 
     return () => {
       cancelled = true;
+      // Without this, an in-flight render from a previous scale keeps painting
+      // onto the canvas after it's been resized for the new scale, producing
+      // overlapping/garbled output (most visible when zoom is clicked rapidly).
+      renderTasks.forEach((task) => task.cancel());
     };
   }, [pageCount, version, scale]);
 
   useEffect(() => {
     if (!scrollTarget) return;
-    const canvas = containerRef.current?.querySelector<HTMLCanvasElement>(
+    const wrapper = containerRef.current;
+    const canvas = wrapper?.querySelector<HTMLCanvasElement>(
       `canvas[data-page="${scrollTarget.page}"]`
     );
-    canvas?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const viewport = viewportsRef.current.get(scrollTarget.page);
+    if (!wrapper || !canvas || !viewport) return;
+    // scrollTarget.v is top-down (the convention CLSI's /sync/code returns);
+    // convert to a device-pixel offset within the canvas, then scroll that
+    // point into the middle of the wrapper.
+    const vBottom = viewport.viewBox[3] - scrollTarget.v;
+    const [, yDev] = viewport.convertToViewportPoint(0, vBottom);
+    const canvasTopInWrapper =
+      canvas.getBoundingClientRect().top - wrapper.getBoundingClientRect().top + wrapper.scrollTop;
+    const targetTop = canvasTopInWrapper + yDev - wrapper.clientHeight / 2;
+    wrapper.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
   }, [scrollTarget]);
 
   function zoomIn() {
@@ -137,7 +155,11 @@ export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps
     const xDev = (event.clientX - rect.left) * (canvas.width / rect.width);
     const yDev = (event.clientY - rect.top) * (canvas.height / rect.height);
     const [h, v] = viewport.convertToPdfPoint(xDev, yDev);
-    onPdfClick?.(page, h, v);
+    // convertToPdfPoint returns PDF user-space v (origin at the page's
+    // bottom edge), but CLSI's SyncTeX /sync/pdf endpoint expects v measured
+    // from the top of the page, so it must be flipped before sending.
+    const vFromTop = viewport.viewBox[3] - v;
+    onPdfClick?.(page, h, vFromTop);
   }
 
   if (!pdfUrl) {
