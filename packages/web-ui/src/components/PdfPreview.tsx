@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { DownloadIcon, MinusIcon, PlusIcon } from "./icons.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -12,11 +13,14 @@ const SCALE_STEP = 0.1;
 
 interface PdfPreviewProps {
   pdfUrl?: string;
+  onPdfClick?: (page: number, h: number, v: number) => void;
+  scrollTarget?: { page: number; v: number; nonce: number };
 }
 
-export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
+export function PdfPreview({ pdfUrl, onPdfClick, scrollTarget }: PdfPreviewProps) {
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportsRef = useRef<Map<number, PageViewport>>(new Map());
   const [pageCount, setPageCount] = useState(0);
   const [version, setVersion] = useState(0);
   const [scale, setScale] = useState(DEFAULT_SCALE);
@@ -55,6 +59,7 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     const container = containerRef.current;
     if (!pdf || !container || pageCount === 0) return;
     let cancelled = false;
+    const renderTasks: ReturnType<PDFPageProxy["render"]>[] = [];
 
     (async () => {
       const canvases = container.querySelectorAll<HTMLCanvasElement>(".pdf-page-canvas");
@@ -66,11 +71,14 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           const page = await pdf.getPage(pageNum);
           if (cancelled) return;
           const viewport = page.getViewport({ scale });
+          viewportsRef.current.set(pageNum, viewport);
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const context = canvas.getContext("2d");
           if (!context) continue;
-          await page.render({ canvasContext: context, viewport }).promise;
+          const task = page.render({ canvasContext: context, viewport });
+          renderTasks.push(task);
+          await task.promise;
         } catch {
           // A render on this canvas may have been superseded by a newer one
           // (e.g. React's dev-mode double-invoke of effects, or a zoom change
@@ -81,8 +89,31 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
 
     return () => {
       cancelled = true;
+      // Without this, an in-flight render from a previous scale keeps painting
+      // onto the canvas after it's been resized for the new scale, producing
+      // overlapping/garbled output (most visible when zoom is clicked rapidly).
+      renderTasks.forEach((task) => task.cancel());
     };
   }, [pageCount, version, scale]);
+
+  useEffect(() => {
+    if (!scrollTarget) return;
+    const wrapper = containerRef.current;
+    const canvas = wrapper?.querySelector<HTMLCanvasElement>(
+      `canvas[data-page="${scrollTarget.page}"]`
+    );
+    const viewport = viewportsRef.current.get(scrollTarget.page);
+    if (!wrapper || !canvas || !viewport) return;
+    // scrollTarget.v is top-down (the convention CLSI's /sync/code returns);
+    // convert to a device-pixel offset within the canvas, then scroll that
+    // point into the middle of the wrapper.
+    const vBottom = viewport.viewBox[3] - scrollTarget.v;
+    const [, yDev] = viewport.convertToViewportPoint(0, vBottom);
+    const canvasTopInWrapper =
+      canvas.getBoundingClientRect().top - wrapper.getBoundingClientRect().top + wrapper.scrollTop;
+    const targetTop = canvasTopInWrapper + yDev - wrapper.clientHeight / 2;
+    wrapper.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  }, [scrollTarget]);
 
   function zoomIn() {
     setScale((s) => Math.min(MAX_SCALE, Math.round((s + SCALE_STEP) * 100) / 100));
@@ -112,6 +143,25 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
     URL.revokeObjectURL(blobUrl);
   }
 
+  function handlePdfClick(event: React.MouseEvent<HTMLDivElement>) {
+    const canvas = (event.target as HTMLElement).closest(
+      "canvas.pdf-page-canvas"
+    ) as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const page = Number(canvas.dataset.page);
+    const viewport = viewportsRef.current.get(page);
+    if (!viewport) return;
+    const rect = canvas.getBoundingClientRect();
+    const xDev = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const yDev = (event.clientY - rect.top) * (canvas.height / rect.height);
+    const [h, v] = viewport.convertToPdfPoint(xDev, yDev);
+    // convertToPdfPoint returns PDF user-space v (origin at the page's
+    // bottom edge), but CLSI's SyncTeX /sync/pdf endpoint expects v measured
+    // from the top of the page, so it must be flipped before sending.
+    const vFromTop = viewport.viewBox[3] - v;
+    onPdfClick?.(page, h, vFromTop);
+  }
+
   if (!pdfUrl) {
     return <div className="pdf-placeholder">Compile to see a preview</div>;
   }
@@ -127,23 +177,47 @@ export function PdfPreview({ pdfUrl }: PdfPreviewProps) {
           {pageCount} page{pageCount === 1 ? "" : "s"}
         </span>
         <div className="zoom-controls">
-          <button onClick={zoomOut} disabled={scale <= MIN_SCALE} title="Zoom out">
-            −
+          <button
+            onClick={zoomOut}
+            disabled={scale <= MIN_SCALE}
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <MinusIcon />
           </button>
-          <span className="zoom-level" title="Reset zoom" onClick={resetZoom}>
+          <span
+            className="zoom-level"
+            title="Reset zoom"
+            role="button"
+            tabIndex={0}
+            aria-label="Reset PDF zoom"
+            onClick={resetZoom}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                resetZoom();
+              }
+            }}
+          >
             {Math.round((scale / DEFAULT_SCALE) * 100)}%
           </span>
-          <button onClick={zoomIn} disabled={scale >= MAX_SCALE} title="Zoom in">
-            +
+          <button
+            onClick={zoomIn}
+            disabled={scale >= MAX_SCALE}
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <PlusIcon />
           </button>
         </div>
-        <button className="download-button" onClick={handleDownload}>
+        <button className="download-button icon-button" onClick={handleDownload}>
+          <DownloadIcon />
           Download PDF
         </button>
       </div>
-      <div className="pdf-canvas-wrapper" ref={containerRef}>
+      <div className="pdf-canvas-wrapper" ref={containerRef} onClick={handlePdfClick}>
         {Array.from({ length: pageCount }, (_, i) => (
-          <canvas key={i} className="pdf-page-canvas" />
+          <canvas key={i} className="pdf-page-canvas" data-page={i + 1} />
         ))}
       </div>
     </div>
